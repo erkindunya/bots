@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link href="/Style%20Library/Kier%20Bot/botchat.css" rel="stylesheet" />
+  <script src="https://code.jquery.com/jquery-3.2.1.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+    crossorigin="anonymous"></script>
+</head>
+
+<body>
+
+  <style>
+    .wc-chatview-panel {
+      height: 450px;
+    }
+
+    #bot {
+      height: 450px;
+    }
+  </style>
+
+  <div id="bot"> </div>
+
+  <button onclick="postButtonMessage(); return false;">Send Test Event</button>
+
+  <button onclick="postListButton(); return false;">Post To List</button>
+
+  <script src="https://unpkg.com/botframework-webchat/botchat.js"></script>
+  <script>
+    var options = {
+      AzureSecret: 'n-vdU9o6m7U.cwA.Qcc.P-pD34TzB2b2A4REierleWYHvt6NgDla6AreAtR6YKY'
+    };
+
+    function InitOptions() {
+      $.ajax({
+        url: 'https://directline.botframework.com/v3/directline/conversations',
+        method: 'POST',
+        headers: {
+          Authorization: 'Bearer ' + options.AzureSecret
+        },
+        async: false,
+        success: function (data) {
+          options.ConverstionId = data.conversationId;
+          options.Token = data.token;
+          options.ExpireTime = data.expires_in;
+          options.Url = data.streamUrl;
+        },
+        error: function (data) {
+          console.log("ERROR");
+        }
+      });
+    }
+
+    function InitUser() {
+      var userid = _spPageContextInfo.userId;
+      var requestUri = _spPageContextInfo.webAbsoluteUrl + "/_api/web/getuserbyid(" + userid + ")";
+      var requestHeaders = { "accept": "application/json;odata=verbose" };
+      $.ajax({
+        url: requestUri,
+        contentType: "application/json;odata=verbose",
+        headers: requestHeaders,
+        async: false,
+        success: onSuccess,
+        error: onError
+      });
+
+      function onSuccess(data, request) {
+        options.user = {
+          Title: data.d.Title,
+          Email: data.d.Email,
+          Id: data.d.Id,
+          LoginName: data.d.LoginName
+        }
+      }
+
+      function onError(error) {
+        alert("error");
+      }
+    }
+
+    function PostToList(user) {
+
+      var data = {
+        '__metadata': { 'type': 'SP.Data.FBA_x0020_User_x0020_RequestListItem' },
+        FullName: options.user.Title,
+        // Title: user.Title,
+        EMail: user.email,
+        MobileNumber: user.phoneNumber,
+        ExternalCompany: user.company
+      }
+
+      var headers = {
+        'Accept': 'application/json;odata=verbose',
+        'X-RequestDigest': $('#__REQUESTDIGEST').val(),
+      }
+
+      $.ajax({
+        url: _spPageContextInfo.siteAbsoluteUrl + "/_api/web/lists/getbytitle('FBA User Request')/items",
+        method: "POST",
+        contentType: "application/json;odata=verbose",
+        data: JSON.stringify(data),
+        headers: headers,
+        async: false,
+        success: function (data) {
+          console.log(data);
+        },
+        error: function (data) {
+          console.log(data);
+        }
+      })
+    }
+
+    function debug(message) {
+      console.log(message);
+    }
+
+    const changeBackgroundColor = function (newColor) {
+      document.body.style.backgroundColor = newColor;
+    }
+
+    const postButtonMessage = function () {
+      botConnection
+        .postActivity({ type: "event", value: "", from: { id: "me" }, name: "buttonClicked" })
+        .subscribe(id => console.log("success"));
+    }
+
+    const postListButton = function () {
+
+      botConnection
+        .postActivity({ type: "event", value: "", from: { id: "me" }, name: "postedList" })
+        .subscribe(id => console.log("success"));
+    }
+
+    InitOptions();
+    InitUser();
+
+    var botConnection = new BotChat.DirectLine({
+      token: options.Token,
+      conversationId: options.ConverstionId,
+    });
+
+    console.log('Bot Connection');
+    console.log(botConnection);
+
+    BotChat.App({
+      botConnection: botConnection,
+      user: { id: options.user.Title },
+      bot: 'Kiera',
+    }, document.getElementById("bot"));
+
+    botConnection.activity$
+      .filter(activity => activity.type === "event" && activity.name === "changeBackground")
+      .subscribe(activity => changeBackgroundColor(activity.value))
+
+    botConnection.activity$
+      .filter(message => message.type === "message" && message.name === "postToList")
+      .subscribe(message => PostToList(message.value));
+
+    botConnection.activity$
+      .filter(message => message.type === "message" && message.name === "debug")
+      .subscribe(message => debug(message.value));
+  </script>
+</body>
+
+</html>
